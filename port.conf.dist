@@ -1,0 +1,24 @@
+#swhtch list
+#
+host=172.16.0.1:Switch_No_1
+host=172.16.1.1:Switch_No_1
+host=172.16.2.1:Switch_No_1
+host=172.16.3.1:3Rd_Floor
+host=172.16.4.1:4Th_Floor
+host=172.16.5.1:Office
+# User list
+#
+user=admin:John Smith
+user=admin2:Ivan Draga
+user=admin3:Black Devil
+# Parameters
+#
+domain=domain.loc
+domain_controller=dc.domain.loc
+loghost=172.16.1.49
+facility=local3
+severity=info
+credentials=ciscouser:password
+logprefix=%4-ERR_DISABLE:
+switches_in_row=3
+sshport=22
