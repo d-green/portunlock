@@ -1,0 +1,53 @@
+body {
+    font-family: arial, helvetica, sans-serif;
+    font-size: 8pt;
+    margin: 1em;
+    padding: 0;
+}
+table.switches {
+    width: 100%;
+    border :1px solid black; 
+    border-collapse:collapse;
+}
+table.ports {
+    width: 100%;
+    border :1px solid black;
+    border-collapse:collapse;
+}
+td.ports{
+    border :1px solid black;
+    border-collapse:collapse;
+}
+tr.header { 
+    background-color: #aaaaaa;
+    border :1px solid black;
+}
+tr.connected { 
+    background-color: #77ff77;
+    border :1px solid black;
+}
+tr.notconnect { 
+    background-color: #eeee77;
+}
+tr.disabled { 
+    background-color: #00eeee;
+}
+tr.errdisabled { 
+    background-color: #ff7777;
+}
+td.macaddress {
+    font-size: 7pt;
+    border :1px solid black;
+    border-collapse:collapse;
+    width=600px;
+}
+td.swsel   {
+    font-size: 7pt;
+    color: white;
+    background-color: #ff7777;
+}
+td.swunsel {
+    font-size: 7pt;
+    color: white;
+    background-color: #eeeeaa;
+}
