@@ -1,4 +1,4 @@
-#swhtch list
+#switch list
 #
 host=172.16.0.1:Switch_No_1
 host=172.16.1.1:Switch_No_1
@@ -8,9 +8,9 @@ host=172.16.4.1:4Th_Floor
 host=172.16.5.1:Office
 # User list
 #
-user=admin:John Smith
-user=admin2:Ivan Draga
-user=admin3:Black Devil
+user=admin:John Smith:rw
+user=admin2:Ivan Draga:rw
+user=admin3:Black Devil:ro
 # Parameters
 #
 domain=domain.loc
