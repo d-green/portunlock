@@ -7,6 +7,7 @@ use CGI::Session '-ip_match';
 use CGI::Cookie;
 use Authen::Simple::ActiveDirectory;
 use Switch;
+use Socket;
 
 open CONFIG, "/usr/local/etc/port.conf" or die "Couldn't open file: $!";
 while (<CONFIG>) {
@@ -22,6 +23,11 @@ while (<CONFIG>) {
         if($key eq 'logprefix'){ $logprefix=$value; }        
         if($key eq 'sshport'){ $sshport=$value; }                        
         if($key eq 'switches_in_row'){ $switches_in_row=$value; }                
+        if($key eq 'dhcp_server'){ $dhcp_server=$value; }                        
+        if($key eq 'dhcp_server'){
+    	    my($val,$name,$pass)=split(/:/,$value); 
+    	    push @dhcp_server,[$val,$name,$pass];
+        }                                
         if($key eq 'host'){
     	    my($val,$disp)=split(/:/,$value); 
     	    push @hosts,[$val,$disp];
@@ -34,6 +40,8 @@ while (<CONFIG>) {
 }
 close CONFIG;
 my $promptEnd = '/\w+[\$\%\#\>]\s{0,1}$/o';
+my $scriptname = $ENV{SCRIPT_NAME};
+my $dhcpip={}; #ip's indexed by mac's
 
 # $Net::OpenSSH::debug=-1;
 sub ltrim { my $s = shift; $s =~ s/^\s+//;       return $s };
@@ -47,6 +55,29 @@ sub validate_host { my $ipadr = shift;
 sub validate_port { my $swport = shift; 
    if($swport=~/^(\w{2})(\d{1})\/(\d{1,2})$/ && $2<=47 ) 
    {return 'port-ok';} else{return 0;}
+}
+sub get_dhcp_db{
+    foreach my $dhcpserver (@dhcp_server)
+    {
+        my $ssh = Net::OpenSSH->new($dhcpserver->[1].':'.$dhcpserver->[2].'@'.$dhcpserver->[0].':'.$sshport, 
+    			    master_opts => [-o => "StrictHostKeyChecking=no"]);
+	$ssh->error and
+           die "Couldn't establish SSH connection: ". $ssh->error;
+	$output=$ssh->capture("show ip dhcp binding");
+        @output=split('\n',$output);
+        splice(@output,0,5);  # remove header
+        splice(@output,-1,1); # remove footer
+        $dhcpip={};
+	foreach my $val (@output){
+    	    $dhcpMac=trim(substr($val,20,19));  # 19 - ???
+    	    if( length($dhcpMac)>14 ){
+    	       $dhcpMac=substr($dhcpMac,2,2).substr($dhcpMac,5,2).'.'.   # translate mac xxxx.xxxx.xxxx.xx from dhcp to xxxx.xxxx.xxxx from switch
+            		 substr($dhcpMac,7,2).substr($dhcpMac,10,2).'.'.
+                	 substr($dhcpMac,12,2).substr($dhcpMac,15,2);
+            }
+    		$dhcpip{$dhcpMac}.=trim(substr($val,0,19));
+        }
+    }
 }
 
 my $q = new CGI;
@@ -66,7 +97,6 @@ $authentificated = $session->param('authentificated');
 $username        = $session->param('username');
 $friendlyname    = $session->param('friendlyname');
 $accesslevel     = $session->param('accesslevel');
-
 if  ( 'POST' eq $q->request_method && $q->param('username') && $q->param('password') )
 {
     my $ad = Authen::Simple::ActiveDirectory->new( host  => $domain_controller, principal => $domain  );
@@ -88,7 +118,7 @@ if  ( 'POST' eq $q->request_method && $q->param('username') && $q->param('passwo
     }
     else
     {
-	print 'Sorry, not authorised.';
+	print 'Sorry, you are not authorized to use this system.';
 	print end_html;
 	$session->flush();
 	exit(0);
@@ -103,7 +133,7 @@ if  ( 'POST' eq $q->request_method && ($q->param('submit') eq 'Logout' ))
     exit(0);
 }
 if ( $authentificated ne 'yes' ) {
-    print start_form(-name => '', -method  => 'POST', -enctype => &CGI::URL_ENCODED, -action => 'port.pl');
+    print start_form(-name => '', -method  => 'POST', -enctype => &CGI::URL_ENCODED, -action => $scriptname );
     print textfield(-name=>'username', -default=>'', -override=>1, -size=>10, -maxlength=>30);
     print "&nbsp";    
     print password_field(-name=>'password',-value=>'',-size=>10, -maxlength=>30);
@@ -113,7 +143,7 @@ if ( $authentificated ne 'yes' ) {
     print end_html;
 }
 if ( $authentificated eq 'yes' ) {
-    print start_form(-name => '', -method  => 'POST', -enctype => &CGI::URL_ENCODED, -action => 'port.pl');
+    print start_form(-name => '', -method  => 'POST', -enctype => &CGI::URL_ENCODED, -action => $scriptname);
     print '<br/>Logged as: &nbsp',$friendlyname,'&nbsp Access:&nbsp',$accesslevel,'&nbsp';
     print submit(-name=>'submit', -value=>'Logout');
     print end_form;
@@ -135,7 +165,7 @@ if ('GET' eq $q->request_method && $q->param('host') && $q->param('act') eq 'ask
 	exit(0);
     }
     print start_form(-name => 'сhange_desc', -method  => 'GET', -enctype => &CGI::URL_ENCODED, 
-                 -action => 'port.pl');
+                 -action => $scriptname);
     print 'Enter description for '.$port. ' on '.$host.':';
     print textfield(-name=>'desc', -default=>$desc, -override=>1, -size=>10, -maxlength=>30);
     print $q->hidden(-name => 'host',-value => $host);
@@ -165,6 +195,7 @@ if( $authentificated eq 'yes' ){
     }
     print '</tr>';
     print '</table>';
+    get_dhcp_db();
 }
 ###############################################
 # Enable shutdowned port
@@ -315,7 +346,8 @@ if ('GET' eq $q->request_method && $q->param('host') && ( $authentificated eq 'y
     print '<table class="ports">';
     print '<tr class="header"><td class="ports">Port</td><td class="ports">Description</td><td class="ports">Status</td>'.
           '<td class="ports">Vlan</td><td class="ports">Duplex</td><td class="ports">Speed</td>'.
-          '<td class="ports">Type</td><td class="ports">Mac address table</td></tr>';
+          '<td class="ports">Type</td><td class="ports">Mac address table</td>'.
+          '<td class="ports">IP address table</td></tr>';
     foreach (sort {$pPort{$a} cmp $pPort{$b}} keys %pPort) {
         print '<tr';
         switch($pStatus{$_}){
@@ -365,8 +397,21 @@ if ('GET' eq $q->request_method && $q->param('host') && ( $authentificated eq 'y
     	print '<td class="ports">',$pDuplex{$_},'</td>';
     	print '<td class="ports">',$pSpeed{$_},'</td>';   
     	print '<td class="ports">',$pType{$_},'</td>';      
-    	print '<td class="macaddress">',$pMac{$_},'</td>';      
-    	print '</tr>';   
+    	print '<td class="macaddress">',$pMac{$_},'</td>';
+
+    	my $mac=trim($pMac{$_});      
+    	my $mac_num=int(length($mac)/14);
+    	print '<td class="ipaddress">';
+	for(my $i=0;$i<$mac_num;$i++)
+	{    	
+	    my $nextmac=trim(substr($mac,$i*15,15));
+	    if( length($dhcpip{$nextmac}) > 0){
+        	    print $dhcpip{$nextmac},'&nbsp';          	
+		    my $reverse_name = gethostbyaddr(inet_aton($dhcpip{$nextmac}), AF_INET);
+		    print $reverse_name,' ';
+	    }
+	}
+    	print '</td></tr>';   
     }
     print '</table>';     
 }
