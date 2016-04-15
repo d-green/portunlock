@@ -69,13 +69,20 @@ sub get_dhcp_db{
         splice(@output,-1,1); # remove footer
         $dhcpip={};
 	foreach my $val (@output){
-    	    $dhcpMac=trim(substr($val,20,19));  # 19 - ???
+	    if (length($val) < 80){
+	        $dhcpMac=trim(substr($val,20,17));  # 19 - ???
+
+	    }
+	    else{
+	        $dhcpMac=trim(substr($val,16,17));  # 19 - ???
+	    }
     	    if( length($dhcpMac)>14 ){
-    	       $dhcpMac=substr($dhcpMac,2,2).substr($dhcpMac,5,2).'.'.   # translate mac xxxx.xxxx.xxxx.xx from dhcp to xxxx.xxxx.xxxx from switch
-            		 substr($dhcpMac,7,2).substr($dhcpMac,10,2).'.'.
-                	 substr($dhcpMac,12,2).substr($dhcpMac,15,2);
+	         $dhcpMac=substr($dhcpMac,2,2).substr($dhcpMac,5,2).'.'.   # translate mac xxxx.xxxx.xxxx.xx got from dhcp to xxxx.xxxx.xxxx from switch
+    		 substr($dhcpMac,7,2).substr($dhcpMac,10,2).'.'.
+        	 substr($dhcpMac,12,2).substr($dhcpMac,15,2);
+                
             }
-    		$dhcpip{$dhcpMac}.=trim(substr($val,0,19));
+    		$dhcpip{$dhcpMac}.=trim(substr($val,0,16));
         }
     }
 }
